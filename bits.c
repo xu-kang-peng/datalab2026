@@ -22,6 +22,7 @@ int bitAnd(int x, int y) {
     int a=~x;
     int b=~y;
     int c=a|b;
+    // 德摩根律：x & y = ~(~x | ~y)
     int d=~c;
     return d;
 }
@@ -36,6 +37,7 @@ int bitAnd(int x, int y) {
 int bitXor(int x, int y) {
     int a=x&y;
     int b=(~x)&(~y);
+    // x ^ y = ~(x & y) & ~(~x & ~y)
     int c=(~a)&(~b);
     return c;
 }
@@ -61,10 +63,12 @@ int samesign(int x, int y) {
     {
         int a=x>>31;
         int b=y>>31;
+        // 非零时看符号位是否相同
         return !(a^b);
     }
     else
     {
+        // 有 0 时只有两个都为 0 才同号
         return !(x^y);
     }
 }
@@ -81,6 +85,7 @@ int samesign(int x, int y) {
 int logtwo(int v) {
     int r = 0;
     int m;
+    // 依次探测高 16、8、4、2、1 位中是否还有 1
     m = (v >> 16 > 0) << 4;
     r = r | m;
     v = v >> m;
@@ -109,10 +114,13 @@ int logtwo(int v) {
 int byteSwap(int x, int n, int m) {
     int a=n<<3;
     int b=m<<3;
+    // 取出第 n、m 个字节
     int n1=(x>>a)&0xFF;
     int m1=(x>>b)&0xFF;
+    // 清空这两个字节
     int mask=~((0xFF<<a)|(0xFF<<b));
     x=mask&x;
+    // 交换后放回
     x=x|(n1<<b)|(m1<<a);
     return x;
 }
@@ -126,6 +134,7 @@ int byteSwap(int x, int n, int m) {
  *   Difficulty: 3
  */
 unsigned reverse(unsigned v) {
+    // 分治交换：16位、8位、4位、2位、1位
     v = (v >> 16) | (v << 16);
     v = ((v & 0xFF00FF00) >> 8) | ((v & 0x00FF00FF) << 8);
     v = ((v & 0xF0F0F0F0) >> 4) | ((v & 0x0F0F0F0F) << 4);
@@ -143,6 +152,7 @@ unsigned reverse(unsigned v) {
  *   Difficulty: 3
  */
 int logicalShift(int x, int n) {
+    // 构造低 (32-n) 位为 1 的掩码，清掉算术右移带入的符号位
     int a=(1<<31)>>n;
     a=a<<1;
     a=~a;
@@ -160,32 +170,39 @@ int logicalShift(int x, int n) {
  *   Difficulty: 4
  */
 int leftBitCount(int x) {
+    // 统计左侧连续 1，等价于统计 ~x 左侧连续 0 前面有多少位
     int y = ~x;
     int count = 0;
     int t;
-    
+
+    // 类似二分：先看高 16 位是否全 0
     t = !(y >> 16);
     count += t << 4;
     y = y << (t << 4);
-    
+
+    // 再看接下来的 8 位
     t = !(y >> 24);
     count += t << 3;
     y = y << (t << 3);
-    
+
+    // 再看接下来的 4 位
     t = !(y >> 28);
     count += t << 2;
     y = y << (t << 2);
-    
+
+    // 再看接下来的 2 位
     t = !(y >> 30);
     count += t << 1;
     y = y << (t << 1);
-    
+
+    // 最后看 1 位
     t = !(y >> 31);
     count += t;
     y = y << t;
-    
+
+    // 若 y 已全 0，说明原 x 全 1
     count += !y;
-    
+
     return count;
 }
 /*
@@ -205,20 +222,24 @@ unsigned float_i2f(int x) {
     if (!x)
         return 0;
 
+    // -2^31 特殊处理，避免取负溢出
     if (x == 0x80000000)
         return 0xCF000000;
 
     if (sign)
         x = -x;
 
+    // 规格化：把最高有效位移到第 31 位
     while (!(x & 0x80000000)) {
         x = x << 1;
         exp = exp - 1;
     }
 
+    // 取尾数高 23 位，低 8 位用于舍入判断
     frac = (x >> 8) & 0x007FFFFF;
     rest = x & 0xFF;
 
+    // 就近舍入到偶数
     if (rest > 0x80) {
         frac = frac + 1;
     }
@@ -227,6 +248,7 @@ unsigned float_i2f(int x) {
             frac = frac + 1;
     }
 
+    // 尾数进位则指数加一
     if (frac & 0x00800000) {
         exp = exp + 1;
         frac = 0;
@@ -251,12 +273,15 @@ unsigned floatScale2(unsigned uf) {
     unsigned sign = uf & 0x80000000;           // 1 op
     unsigned frac = uf & 0x7FFFFF;             // 1 op
 
+    // NaN 或 INF 直接返回
     if (exp == 0xFF)                           // 1 op
         return uf;
 
+    // 非规格化数：整体左移尾数即可乘 2
     if (exp == 0)                              // 1 op
         return sign | (frac << 1);             // 2 ops: << |
 
+    // 规格化数：指数加一
     return sign | ((exp + 1) << 23) | frac;    // 4 ops: + << | |
 }
 
@@ -286,20 +311,25 @@ int float64_f2i(unsigned uf1, unsigned uf2) {
     exp = (uf2 >> 20) & 0x7FF;
     E = exp - 1023;
 
+    // NaN 或 INF
     if (!(exp-0x7FF))
         return 0x80000000;
 
+    // 太小，向零取整为 0
     if (E < 0)
         return 0;
 
+    // 超出 int 可表示范围
     if (E > 30)
         return 0x80000000;
 
     frac_hi = uf2 & 0xFFFFF;
     frac_lo = uf1;
 
+    // 补上隐含的 1
     sig_hi = frac_hi | 0x100000;
 
+    // 根据阶码决定有效数字如何拼接
     if (E < 21) {
         result = sig_hi >> (20 - E);
     } else {
@@ -326,14 +356,18 @@ int float64_f2i(unsigned uf1, unsigned uf2) {
  *   Difficulty: 4
  */
 unsigned floatPower2(int x) {
+    // 小于最小非规格化数
     if (x < -149)
         return 0;
 
+    // 非规格化范围
     if (x < -126)
         return 1 << (x + 149);
 
+    // 超出最大规格化数
     if (x > 127)
         return 0x7F800000;
 
+    // 规格化数：指数加上偏置 127
     return (x + 127) << 23;
 }
